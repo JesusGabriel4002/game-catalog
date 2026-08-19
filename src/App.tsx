@@ -82,21 +82,15 @@ function formatSavings(value: string) {
 function RootLayout() {
   return (
     <div className="app-shell">
-      <header className="hero-shell">
-        <div className="hero-content">
-          <div className="hero-copy">
-            <span className="eyebrow">Portfolio project</span>
-            <h1>Game Catalog</h1>
-            <p>
-              A responsive React + TypeScript catalog that consumes a public
-              REST API with Axios, handles async states with TanStack Query and
-              demonstrates client-side routing with TanStack Router.
-            </p>
-          </div>
-
+      <header className="topbar">
+        <div className="topbar-inner">
+          <span className="logo">
+            <span className="logo-dot" />
+            GameDeals
+          </span>
           <nav className="top-nav" aria-label="Main navigation">
             <Link to="/" className="nav-link" activeProps={{ className: 'nav-link active' }}>
-              Catalog
+              Deals
             </Link>
             <Link
               to="/about"
@@ -170,88 +164,73 @@ function CatalogPage() {
 
   return (
     <div className="stack">
-      <section className="panel stats-grid">
-        <StatCard label="Stack" value="React, TS, Query" />
-        <StatCard label="Data source" value="CheapShark API" />
-        <StatCard label="States covered" value="Loading, error, empty" />
-      </section>
+      <form className="filters-bar" onSubmit={handleSubmit}>
+        <label className="field">
+          <label htmlFor="search">Search</label>
+          <input
+            id="search"
+            value={draftSearch}
+            onChange={(event) => setDraftSearch(event.target.value)}
+            placeholder="Elden Ring, Hades, Hollow Knight…"
+          />
+        </label>
 
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <h2>Browse deals</h2>
-            <p>
-              Search by title, filter by store and cap the maximum price. The
-              list keeps the previous page visible while new data loads.
-            </p>
-          </div>
+        <label className="field">
+          <label htmlFor="store">Store</label>
+          <select
+            id="store"
+            value={filters.storeId}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                storeId: event.target.value,
+                page: 0,
+              }))
+            }
+            disabled={storesQuery.isLoading}
+          >
+            <option value="">All stores</option>
+            {(storesQuery.data ?? []).map((store) => (
+              <option key={store.storeID} value={store.storeID}>
+                {store.storeName}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <label htmlFor="maxprice">Max price (USD)</label>
+          <input
+            id="maxprice"
+            type="number"
+            min="0"
+            step="1"
+            value={filters.maxPrice}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                maxPrice: event.target.value,
+                page: 0,
+              }))
+            }
+            placeholder="e.g. 20"
+          />
+        </label>
+
+        <div className="filter-actions">
+          <button type="submit" className="btn-primary">
+            Search
+          </button>
+          <button type="button" className="btn-ghost" onClick={handleReset}>
+            Clear
+          </button>
         </div>
-
-        <form className="filters-grid" onSubmit={handleSubmit}>
-          <label className="field">
-            <span>Search title</span>
-            <input
-              value={draftSearch}
-              onChange={(event) => setDraftSearch(event.target.value)}
-              placeholder="Try Elden Ring, Hades, Hollow Knight..."
-            />
-          </label>
-
-          <label className="field">
-            <span>Store</span>
-            <select
-              value={filters.storeId}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  storeId: event.target.value,
-                  page: 0,
-                }))
-              }
-              disabled={storesQuery.isLoading}
-            >
-              <option value="">All stores</option>
-              {(storesQuery.data ?? []).map((store) => (
-                <option key={store.storeID} value={store.storeID}>
-                  {store.storeName}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Max price (USD)</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={filters.maxPrice}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  maxPrice: event.target.value,
-                  page: 0,
-                }))
-              }
-              placeholder="40"
-            />
-          </label>
-
-          <div className="actions">
-            <button type="submit" className="primary-button">
-              Apply search
-            </button>
-            <button type="button" className="ghost-button" onClick={handleReset}>
-              Reset
-            </button>
-          </div>
-        </form>
-      </section>
+      </form>
 
       {storesQuery.isError ? (
         <StatusPanel
           title="Could not load stores"
-          body="The API request for stores failed. Refresh the page to try again."
+          body="The stores request failed. Refresh the page to try again."
           tone="error"
         />
       ) : null}
@@ -259,15 +238,15 @@ function CatalogPage() {
       {dealsQuery.isError ? (
         <StatusPanel
           title="Could not load deals"
-          body="The deal request failed. This screen intentionally surfaces the error state instead of hiding it."
+          body="The deal request failed. Check your connection and try again."
           tone="error"
         />
       ) : null}
 
       {dealsQuery.isLoading ? (
         <StatusPanel
-          title="Loading deals"
-          body="Fetching the first page from the API and preparing the catalog."
+          title="Loading…"
+          body="Fetching deals from the API."
           tone="loading"
         />
       ) : null}
@@ -277,7 +256,7 @@ function CatalogPage() {
           title="No deals found"
           body={
             hasActiveFilters
-              ? 'Try removing a filter or broadening the search term.'
+              ? 'No results for these filters. Try broadening your search.'
               : 'The API returned no deals for this page.'
           }
           tone="empty"
@@ -286,15 +265,12 @@ function CatalogPage() {
 
       {!dealsQuery.isLoading && !dealsQuery.isError && deals.length > 0 ? (
         <>
-          <section className="section-heading inline">
-            <div>
-              <h2>Results</h2>
-              <p>
-                Page {pageLabel} of {totalPages}
-                {dealsQuery.isFetching ? ' · Updating data…' : ''}
-              </p>
-            </div>
-          </section>
+          <div className="results-meta">
+            <h2>
+              Page {pageLabel} of {totalPages}
+              {dealsQuery.isFetching ? ' · Updating…' : ''}
+            </h2>
+          </div>
 
           <section className="deal-grid">
             {deals.map((deal) => (
@@ -302,80 +278,62 @@ function CatalogPage() {
                 <img
                   className="deal-thumb"
                   src={deal.thumb}
-                  alt={`Cover art for ${deal.title}`}
+                  alt={deal.title}
                   loading="lazy"
                 />
-
                 <div className="deal-body">
-                  <div className="deal-meta">
-                    <span className="pill accent">
-                      {storesById.get(deal.storeID) ?? 'Store unavailable'}
+                  <div className="deal-top-row">
+                    <span className="deal-store">
+                      {storesById.get(deal.storeID) ?? '—'}
                     </span>
-                    <span className="pill">{formatSavings(deal.savings)}</span>
+                    <span className="deal-badge">{formatSavings(deal.savings)}</span>
                   </div>
-
-                  <div className="deal-copy">
-                    <h3>{deal.title}</h3>
-                    <p>
-                      Rating:{' '}
-                      {deal.steamRatingText && deal.steamRatingPercent
-                        ? `${deal.steamRatingText} (${deal.steamRatingPercent}%)`
-                        : 'Not available'}
+                  <p className="deal-title">{deal.title}</p>
+                  {deal.steamRatingText ? (
+                    <p className="deal-rating">
+                      {deal.steamRatingText} · {deal.steamRatingPercent}%
                     </p>
-                  </div>
-
+                  ) : null}
                   <div className="deal-prices">
-                    <strong>{formatCurrency(deal.salePrice)}</strong>
-                    <span>{formatCurrency(deal.normalPrice)}</span>
+                    <span className="deal-price-sale">{formatCurrency(deal.salePrice)}</span>
+                    <span className="deal-price-original">{formatCurrency(deal.normalPrice)}</span>
                   </div>
                 </div>
               </article>
             ))}
           </section>
 
-          <section className="panel pagination-row">
-            <div>
-              <h2>Pagination</h2>
-              <p>
-                Uses the `X-Total-Page-Count` response header exposed by the
-                API.
-              </p>
-            </div>
-
+          <div className="pagination">
+            <span className="pagination-info">
+              Showing page {pageLabel} of {totalPages}
+            </span>
             <div className="pagination-controls">
               <button
                 type="button"
-                className="ghost-button"
+                className="btn-ghost"
                 onClick={() =>
-                  setFilters((current) => ({
-                    ...current,
-                    page: Math.max(current.page - 1, 0),
-                  }))
+                  setFilters((c) => ({ ...c, page: Math.max(c.page - 1, 0) }))
                 }
                 disabled={filters.page === 0 || dealsQuery.isFetching}
               >
-                Previous
+                ← Previous
               </button>
-
-              <span className="page-indicator">
-                {pageLabel} / {totalPages}
-              </span>
-
+              <span className="page-indicator">{pageLabel} / {totalPages}</span>
               <button
                 type="button"
-                className="primary-button"
+                className="btn-primary"
                 onClick={() =>
-                  setFilters((current) => ({
-                    ...current,
-                    page: Math.min(current.page + 1, Math.max(totalPages - 1, 0)),
+                  setFilters((c) => ({
+                    ...c,
+                    page: Math.min(c.page + 1, Math.max(totalPages - 1, 0)),
                   }))
                 }
                 disabled={filters.page >= totalPages - 1 || dealsQuery.isFetching}
               >
-                Next
+                Next →
               </button>
             </div>
-          </section>
+          </div>
         </>
       ) : null}
     </div>
@@ -384,48 +342,35 @@ function CatalogPage() {
 
 function AboutPage() {
   return (
-    <div className="stack">
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <h2>Why this project exists</h2>
-            <p>
-              This project was built as a frontend portfolio piece focused on
-              practical product concerns: responsive layout, async states,
-              reusable UI pieces and clear data flow.
-            </p>
-          </div>
-        </div>
+    <div className="about-wrapper">
+      <div className="about-header">
+        <h1>About this project</h1>
+        <p>
+          GameDeals is a frontend portfolio project that consumes the CheapShark
+          public API to list PC game deals. Built to demonstrate practical
+          product concerns, not just "a working page".
+        </p>
+      </div>
 
-        <div className="about-grid">
-          <FeatureCard
-            title="Routing"
-            body="Client-side navigation is handled with TanStack Router using a catalog screen and a secondary about route."
-          />
-          <FeatureCard
-            title="Server state"
-            body="REST data is fetched with Axios and orchestrated with TanStack Query, including previous-data preservation during pagination."
-          />
-          <FeatureCard
-            title="State design"
-            body="The UI explicitly covers loading, error and empty states instead of assuming the happy path."
-          />
-          <FeatureCard
-            title="Responsiveness"
-            body="The layout adapts from a single-column mobile flow to a denser desktop grid while preserving readability."
-          />
-        </div>
-      </section>
+      <div className="about-grid">
+        <FeatureCard
+          title="TanStack Router"
+          body="Client-side routing with typed routes, preloading on hover and a clean separation between the catalog and about screens."
+        />
+        <FeatureCard
+          title="TanStack Query + Axios"
+          body="Server state management with request deduplication, stale-while-revalidate caching and previous-data preservation during pagination."
+        />
+        <FeatureCard
+          title="Explicit async states"
+          body="Loading, error and empty states are all handled in the UI instead of hiding behind a single spinner. Each has its own message and visual treatment."
+        />
+        <FeatureCard
+          title="Responsive layout"
+          body="Four columns on wide screens, three on medium, two on mobile, one on small phones — driven by CSS Grid without JavaScript."
+        />
+      </div>
     </div>
-  )
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <article className="stat-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
   )
 }
 
