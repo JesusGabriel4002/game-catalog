@@ -63,9 +63,37 @@ async function fetchDeals(filters: Filters): Promise<DealsResponse> {
   })
 
   return {
-    deals: response.data,
+    deals: rankDealsBySearch(response.data, filters.search),
     totalPages: Number(response.headers['x-total-page-count'] ?? 1),
   }
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function searchRank(title: string, query: string) {
+  const normalizedTitle = title.trim().toLowerCase()
+  const normalizedQuery = query.trim().toLowerCase()
+
+  if (normalizedTitle === normalizedQuery) return 0
+
+  const startsWord = new RegExp(`(?:^|\\s)${escapeRegExp(normalizedQuery)}(?:\\s|$)`, 'i')
+  if (startsWord.test(normalizedTitle)) return 1
+  if (normalizedTitle.startsWith(normalizedQuery)) return 2
+  if (normalizedTitle.includes(normalizedQuery)) return 3
+
+  return 4
+}
+
+function rankDealsBySearch(deals: Deal[], query: string) {
+  const normalizedQuery = query.trim()
+  if (!normalizedQuery) return deals
+
+  return deals
+    .map((deal, index) => ({ deal, index, rank: searchRank(deal.title, normalizedQuery) }))
+    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .map(({ deal }) => deal)
 }
 
 function formatCurrency(value: string) {
@@ -85,7 +113,7 @@ function RootLayout() {
       <header className="topbar">
         <div className="topbar-inner">
           <span className="logo">
-            <span className="logo-dot" />
+            <span className="logo-mark" aria-hidden="true" />
             GameDeals
           </span>
           <nav className="top-nav" aria-label="Main navigation">
@@ -165,7 +193,7 @@ function CatalogPage() {
   return (
     <div className="stack">
       <form className="filters-bar" onSubmit={handleSubmit}>
-        <label className="field">
+        <div className="field">
           <label htmlFor="search">Search</label>
           <input
             id="search"
@@ -173,9 +201,9 @@ function CatalogPage() {
             onChange={(event) => setDraftSearch(event.target.value)}
             placeholder="Elden Ring, Hades, Hollow Knight…"
           />
-        </label>
+        </div>
 
-        <label className="field">
+        <div className="field">
           <label htmlFor="store">Store</label>
           <select
             id="store"
@@ -196,9 +224,9 @@ function CatalogPage() {
               </option>
             ))}
           </select>
-        </label>
+        </div>
 
-        <label className="field">
+        <div className="field">
           <label htmlFor="maxprice">Max price (USD)</label>
           <input
             id="maxprice"
@@ -215,7 +243,7 @@ function CatalogPage() {
             }
             placeholder="e.g. 20"
           />
-        </label>
+        </div>
 
         <div className="filter-actions">
           <button type="submit" className="btn-primary">
@@ -272,15 +300,17 @@ function CatalogPage() {
             </h2>
           </div>
 
-          <section className="deal-grid">
+          <section className={dealsQuery.isFetching ? 'deal-grid is-updating' : 'deal-grid'}>
             {deals.map((deal) => (
               <article className="deal-card" key={deal.dealID}>
-                <img
-                  className="deal-thumb"
-                  src={deal.thumb}
-                  alt={deal.title}
-                  loading="lazy"
-                />
+                <div className="deal-media">
+                  <img
+                    className="deal-thumb"
+                    src={deal.thumb}
+                    alt={deal.title}
+                    loading="lazy"
+                  />
+                </div>
                 <div className="deal-body">
                   <div className="deal-top-row">
                     <span className="deal-store">
@@ -310,7 +340,9 @@ function CatalogPage() {
             <div className="pagination-controls">
               <button
                 type="button"
-                className="btn-ghost"
+                className={
+                  filters.page > 0 && filters.page >= totalPages - 1 ? 'btn-primary' : 'btn-ghost'
+                }
                 onClick={() =>
                   setFilters((c) => ({ ...c, page: Math.max(c.page - 1, 0) }))
                 }
